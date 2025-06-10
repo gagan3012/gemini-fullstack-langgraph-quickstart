@@ -10,7 +10,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Updated InputFormProps
 interface InputFormProps {
   onSubmit: (inputValue: string, effort: string, model: string) => void;
   onCancel: () => void;
@@ -26,7 +25,7 @@ export const InputForm: React.FC<InputFormProps> = ({
 }) => {
   const [internalInputValue, setInternalInputValue] = useState("");
   const [effort, setEffort] = useState("medium");
-  const [model, setModel] = useState("deepseek/deepseek-chat-v3-0324:free");
+    const [model, setModel] = useState("deepseek/deepseek-chat-v3-0324:free");
 
   const handleInternalSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -101,26 +100,26 @@ export const InputForm: React.FC<InputFormProps> = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-neutral-800 border-neutral-600">
-                <SelectItem value="deepseek/deepseek-chat-v3-0324:free" className="hover:bg-neutral-700 cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="h-3 w-3 text-blue-400" />
-                    <span>Deepseek V3</span>
-                    <span className="text-xs text-green-400">(Latest)</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="qwen/qwen3-235b-a22b:free" className="hover:bg-neutral-700 cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="h-3 w-3 text-purple-400" />
-                    <span>Qwen 3</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="google/gemini-2.5-pro-exp-03-25" className="hover:bg-neutral-700 cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="h-3 w-3 text-yellow-400" />
-                    <span>Gemini 2.5 Pro</span>
-                    <span className="text-xs text-blue-400">(Most Capable)</span>
-                  </div>
-                </SelectItem>
+                              <SelectItem value="deepseek/deepseek-chat-v3-0324:free" className="hover:bg-neutral-700 cursor-pointer">
+                                  <div className="flex items-center gap-2">
+                                      <Cpu className="h-3 w-3 text-blue-400" />
+                                      <span>Deepseek V3</span>
+                                      <span className="text-xs text-green-400">(Latest)</span>
+                                  </div>
+                              </SelectItem>
+                              <SelectItem value="qwen/qwen3-235b-a22b:free" className="hover:bg-neutral-700 cursor-pointer">
+                                  <div className="flex items-center gap-2">
+                                      <Cpu className="h-3 w-3 text-purple-400" />
+                                      <span>Qwen 3</span>
+                                  </div>
+                              </SelectItem>
+                              <SelectItem value="google/gemini-2.5-pro-exp-03-25" className="hover:bg-neutral-700 cursor-pointer">
+                                  <div className="flex items-center gap-2">
+                                      <Cpu className="h-3 w-3 text-yellow-400" />
+                                      <span>Gemini 2.5 Pro</span>
+                                      <span className="text-xs text-blue-400">(Most Capable)</span>
+                                  </div>
+                              </SelectItem>
               </SelectContent>
             </Select>
           </div>

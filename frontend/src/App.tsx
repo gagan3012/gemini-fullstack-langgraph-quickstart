@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ProcessedEvent } from "@/components/ActivityTimeline";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatMessagesView } from "@/components/ChatMessagesView";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 export default function App() {
   const [processedEventsTimeline, setProcessedEventsTimeline] = useState<
@@ -25,45 +26,100 @@ export default function App() {
       ? "http://localhost:2024"
       : "http://localhost:8123",
     assistantId: "agent",
-    messagesKey: "messages",
-    onFinish: (event: any) => {
-      console.log(event);
+    messagesKey: "messages",    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onFinish: (state: any) => {
+      console.log(state);
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onUpdateEvent: (event: any) => {
+      console.log("Received event:", event);
       let processedEvent: ProcessedEvent | null = null;
-      if (event.generate_query) {
-        processedEvent = {
-          title: "Generating Search Queries",
-          data: event.generate_query.query_list.join(", "),
-        };
-      } else if (event.web_research) {
-        const sources = event.web_research.sources_gathered || [];
-        const numSources = sources.length;
-        const uniqueLabels = [
-          ...new Set(sources.map((s: any) => s.label).filter(Boolean)),
-        ];
-        const exampleLabels = uniqueLabels.slice(0, 3).join(", ");
-        processedEvent = {
-          title: "Web Research",
-          data: `Gathered ${numSources} sources. Related to: ${
-            exampleLabels || "N/A"
-          }.`,
-        };
-      } else if (event.reflection) {
-        processedEvent = {
-          title: "Reflection",
-          data: event.reflection.is_sufficient
-            ? "Search successful, generating final answer."
-            : `Need more information, searching for ${event.reflection.follow_up_queries.join(
+
+      // Handle different event types based on LangGraph node names
+      if (event.event === "on_chain_start" || event.event === "on_chain_stream") {
+        const metadata = (event.metadata as Record<string, unknown>) || {};
+        const data = (event.data as Record<string, unknown>) || {};
+
+        // Handle node-specific events
+        if (metadata.langgraph_node === "generate_query" && data.output) {
+          const output = data.output as { query_list?: string[] };
+          processedEvent = {
+            title: "Generating Search Queries",
+            data: Array.isArray(output.query_list)
+              ? output.query_list.join(", ")
+              : "Generating search queries...",
+          };
+        } else if (metadata.langgraph_node === "web_research" && data.output) {
+          const output = data.output as { sources_gathered?: Array<{ label: string }> };
+          const sources = output.sources_gathered || [];
+          const numSources = sources.length;
+          const uniqueLabels = [
+            ...new Set(sources.map((s) => s.label).filter(Boolean)),
+          ];
+          const exampleLabels = uniqueLabels.slice(0, 3).join(", ");
+          processedEvent = {
+            title: "Web Research",
+            data: `Gathered ${numSources} sources. Related to: ${exampleLabels || "N/A"
+              }.`,
+          };
+        } else if (metadata.langgraph_node === "reflection" && data.output) {
+          const output = data.output as { is_sufficient?: boolean; follow_up_queries?: string[] };
+          processedEvent = {
+            title: "Reflection",
+            data: output.is_sufficient
+              ? "Search successful, generating final answer."
+              : `Need more information, searching for ${(output.follow_up_queries || []).join(
                 ", "
               )}`,
-        };
-      } else if (event.finalize_answer) {
-        processedEvent = {
-          title: "Finalizing Answer",
-          data: "Composing and presenting the final answer.",
-        };
-        hasFinalizeEventOccurredRef.current = true;
+          };
+        } else if (metadata.langgraph_node === "finalize_answer") {
+          processedEvent = {
+            title: "Finalizing Answer",
+            data: "Composing and presenting the final answer.",
+          };
+          hasFinalizeEventOccurredRef.current = true;
+        }
+      }
+
+      // Fallback for legacy event format
+      if (!processedEvent) {
+        const legacyEvent = event as Record<string, unknown>;
+        if (legacyEvent.generate_query) {
+          const generateQuery = legacyEvent.generate_query as { query_list?: string[] };
+          processedEvent = {
+            title: "Generating Search Queries",
+            data: generateQuery.query_list?.join(", ") || "Generating search queries...",
+          };
+        } else if (legacyEvent.web_research) {
+          const webResearch = legacyEvent.web_research as { sources_gathered?: Array<{ label: string }> };
+          const sources = webResearch.sources_gathered || [];
+          const numSources = sources.length;
+          const uniqueLabels = [
+            ...new Set(sources.map((s) => s.label).filter(Boolean)),
+          ];
+          const exampleLabels = uniqueLabels.slice(0, 3).join(", ");
+          processedEvent = {
+            title: "Web Research",
+            data: `Gathered ${numSources} sources. Related to: ${exampleLabels || "N/A"
+              }.`,
+          };
+        } else if (legacyEvent.reflection) {
+          const reflection = legacyEvent.reflection as { is_sufficient?: boolean; follow_up_queries?: string[] };
+          processedEvent = {
+            title: "Reflection",
+            data: reflection.is_sufficient
+              ? "Search successful, generating final answer."
+              : `Need more information, searching for ${(reflection.follow_up_queries || []).join(
+                ", "
+              )}`,
+          };
+        } else if (legacyEvent.finalize_answer) {
+          processedEvent = {
+            title: "Finalizing Answer",
+            data: "Composing and presenting the final answer.",
+          };
+          hasFinalizeEventOccurredRef.current = true;
+        }
       }
       if (processedEvent) {
         setProcessedEventsTimeline((prevEvents) => [
@@ -97,6 +153,7 @@ export default function App() {
           ...prev,
           [lastMessage.id!]: [...processedEventsTimeline],
         }));
+        setProcessedEventsTimeline([]);
       }
       hasFinalizeEventOccurredRef.current = false;
     }
@@ -146,39 +203,40 @@ export default function App() {
     },
     [thread]
   );
-
   const handleCancel = useCallback(() => {
     thread.stop();
     window.location.reload();
   }, [thread]);
 
   return (
-    <div className="flex h-screen bg-neutral-800 text-neutral-100 font-sans antialiased">
-      <main className="flex-1 flex flex-col overflow-hidden max-w-4xl mx-auto w-full">
-        <div
-          className={`flex-1 overflow-y-auto ${
-            thread.messages.length === 0 ? "flex" : ""
-          }`}
-        >
-          {thread.messages.length === 0 ? (
-            <WelcomeScreen
-              handleSubmit={handleSubmit}
-              isLoading={thread.isLoading}
-              onCancel={handleCancel}
-            />
-          ) : (
-            <ChatMessagesView
-              messages={thread.messages}
-              isLoading={thread.isLoading}
-              scrollAreaRef={scrollAreaRef}
-              onSubmit={handleSubmit}
-              onCancel={handleCancel}
-              liveActivityEvents={processedEventsTimeline}
-              historicalActivities={historicalActivities}
-            />
-          )}
-        </div>
-      </main>
-    </div>
+    <ThemeProvider>
+      <div className="flex h-screen bg-gradient-to-br from-neutral-50 via-neutral-100 to-neutral-50 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-900 text-neutral-900 dark:text-neutral-100 font-sans antialiased transition-colors duration-300">
+        <main className="flex-1 flex flex-col overflow-hidden w-full">
+          <div
+            className={`flex-1 overflow-y-auto ${
+              thread.messages.length === 0 ? "flex" : ""
+            }`}
+          >
+            {thread.messages.length === 0 ? (
+              <WelcomeScreen
+                handleSubmit={handleSubmit}
+                isLoading={thread.isLoading}
+                onCancel={handleCancel}
+              />
+            ) : (
+              <ChatMessagesView
+                messages={thread.messages}
+                isLoading={thread.isLoading}
+                scrollAreaRef={scrollAreaRef}
+                onSubmit={handleSubmit}
+                onCancel={handleCancel}
+                liveActivityEvents={processedEventsTimeline}
+                historicalActivities={historicalActivities}
+              />
+            )}
+          </div>
+        </main>
+      </div>
+    </ThemeProvider>
   );
 }
